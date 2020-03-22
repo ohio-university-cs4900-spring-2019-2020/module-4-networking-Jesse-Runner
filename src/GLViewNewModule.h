@@ -2,6 +2,9 @@
 
 #include "GLView.h"
 #include "irrKlang.h"
+#include "NetMessengerClient.h"
+#include "Model.h"
+#include "WO.h"
 using namespace irrklang;
 
 namespace Aftr
@@ -20,6 +23,38 @@ namespace Aftr
     \{
 */
 
+
+  
+	   class Cone
+	   {
+	   public:
+		   static Cone* New(Vector position = Vector(25, 25, 25), const std::string file = "../mm/models/cone.wrl") {
+			   return new Cone(position, file);
+		   }
+
+		   void setPosition(float x, float y, float z) {
+			   cone->setPosition(Vector(x, y, z));
+		   };
+		   void setPosition(Vector v) {
+			   cone->setPosition(v);
+		   };
+		   Vector getPosition() {
+			   return cone->getPosition();
+		   };
+		   WO* getWorldObject() {
+			   return cone;
+		   };
+
+	   protected:
+		   WO* cone;
+		   Cone(Vector position = Vector(25, 25, 25), const std::string file = "../mm/models/cone.wrl") {
+			   this->cone = WO::New(file, Vector(1, 1, 1), MESH_SHADING_TYPE::mstFLAT);
+			   this->cone->setPosition(position);
+		   }
+	   };
+
+
+
 class GLViewNewModule : public GLView
 {
 public:
@@ -34,11 +69,14 @@ public:
    virtual void onMouseMove( const SDL_MouseMotionEvent& e );
    virtual void onKeyDown( const SDL_KeyboardEvent& key );
    virtual void onKeyUp( const SDL_KeyboardEvent& key );
+   Cone* cone;
 
 protected:
    GLViewNewModule( const std::vector< std::string >& args );
    virtual void onCreate(); 
-   ISoundEngine* SoundEngine = nullptr;  
+   ISoundEngine* SoundEngine = nullptr; 
+   WO* spider_model = nullptr;
+   NetMessengerClient* client;
 };
 
 /** \} */

@@ -33,15 +33,18 @@
 #include "WONVPhysX.h"
 #include "WONVDynSphere.h"
 #include "AftrGLRendererBase.h"
+#include "NetMsg.h"
+#include "GLView.h"
+//#include "network.h"
 
 //If we want to use way points, we need to include this.
 #include "NewModuleWayPoints.h"
-
-
-
+ 
 using namespace Aftr;
 using namespace irrklang;
 using namespace std;
+
+float spider_movement = 200;
 
  vec3df CamDirection(Aftr::Vector cameraDirection) {
 	float positionX = cameraDirection[0];
@@ -67,11 +70,85 @@ vec3df CamNorm(Vector cameraNormal) {
 	return newnorm;
 }
 
+//namespace Aftr
+//{
+//
+//	class Cone
+//	{
+//	public:
+//		static Cone* New(Vector position = Vector(25, 0, 5), const std::string file = "../mm/models/cone.wrl") {
+//			return new Cone(position, file);
+//		}
+//
+//		void setPosition(float x, float y, float z) {
+//			cone->setPosition(Vector(x, y, z));
+//		};
+//		void setPosition(Vector v) {
+//			cone->setPosition(v);
+//		};
+//		Vector getPosition() {
+//			return cone->getPosition();
+//		};
+//		WO* getWorldObject() {
+//			return cone;
+//		};
+//
+//	protected:
+//		WO* cone;
+//		Cone(Vector position = Vector(25, 0, 5), const std::string file = "../mm/models/cone.wrl") {
+//			this->cone = WO::New(file, Vector(0.01, 0.01, 0.01), MESH_SHADING_TYPE::mstFLAT);
+//			this->cone->setPosition(position);
+//		}
+//	};
+//
+//}
+
+#ifdef AFTR_CONFIG_USE_BOOST
+	class MyMessenger : public NetMsg
+	{
+	public:
+		NetMsgMacroDeclaration(MyMessenger);
+
+		MyMessenger(const Vector& pos) {
+			this->pos = pos;
+		}
+		virtual ~MyMessenger() {
+
+		}
+		virtual bool toStream(NetMessengerStreamBuffer& os) const {
+			os << this->pos.x;
+			os << this->pos.y;
+			os << this->pos.z;
+			return true;
+		}
+		virtual bool fromStream(NetMessengerStreamBuffer& is) {
+			is >> this->pos.x;
+			is >> this->pos.y;
+			is >> this->pos.z;
+			return true;
+		}
+		virtual void onMessageArrived() {
+			((GLViewNewModule*)ManagerGLView::getGLView())->cone->setPosition(this->pos.x, this->pos.y, this->pos.z);
+		}
+		virtual std::string toString() const {
+			std::stringstream ss;
+			ss << NetMsg::toString();
+			ss << "Payload: Position = {" << this->pos.x << "," << this->pos.z << "}\n";
+			return ss.str();
+		}
+
+	protected:
+		Aftr::Vector pos;
+	};
+
+#endif
+
 
 GLViewNewModule* GLViewNewModule::New( const std::vector< std::string >& args )
 {
    GLViewNewModule* glv = new GLViewNewModule( args );
    glv->init( Aftr::GRAVITY, Vector( 0, 0, -1.0f ), "aftr.conf", PHYSICS_ENGINE_TYPE::petODE );
+   glv->client = NetMessengerClient::New("127.0.0.1");
    glv->onCreate();
    return glv;
 }
@@ -111,7 +188,6 @@ void GLViewNewModule::onCreate()
 
 	this->SoundEngine = createIrrKlangDevice();
 	SoundEngine->setRolloffFactor(.25f);
-
 	vec3df positionVector = CamPosition(this->getCamera()->getPosition());
 	vec3df directionVector = CamDirection(this->getCamera()->getLookDirection());
 	vec3df normalVector = CamNorm(this->getCamera()->getNormalDirection());
@@ -119,10 +195,8 @@ void GLViewNewModule::onCreate()
 
 	SoundEngine -> setListenerPosition(positionVector, directionVector, velocityVector, normalVector);
 
-
-	//ISound* I = SoundEngine->play2D("../IrrKlang-64bit-1.6.0/media/noscrubs.wav");
-	//ISound* I2 = SoundEngine->play3D("../IrrKlang-64bit-1.6.0/media/noscrubs.wav", vec3df(50, 0, 100), true, false, true);
-	//I2->setMinDistance(1.0f);
+	this->cone = Cone::New();
+	worldLst->push_back(this->cone->getWorldObject());
 
 }
 GLViewNewModule::~GLViewNewModule()
@@ -180,23 +254,34 @@ void GLViewNewModule::onMouseMove( const SDL_MouseMotionEvent& e )
 
 void GLViewNewModule::onKeyDown( const SDL_KeyboardEvent& key )
 {
+   
    GLView::onKeyDown( key );
-   if (key.keysym.sym == SDLK_q)
+   if (key.keysym.sym == SDLK_s)
    {
-	  // ISound* I = SoundEngine->play2D("../IrrKlang-64bit-1.6.0/media/noscrubs.wav");
+	   ISound* I = SoundEngine->play2D("../IrrKlang-64bit-1.6.0/media/heartbeat.wav",true);
+
    }
    if (key.keysym.sym == SDLK_f)
    {
-	     ISound* I2 = SoundEngine->play3D("../IrrKlang-64bit-1.6.0/media/noscrubs.wav", vec3df(50, 0, 100), true, false, true);
-		 I2->setMinDistance(25.0f);
-		 I2->setVolume(0.1);
+
+	   if (spider_movement != 0)
+		   spider_movement = spider_movement - 25;
+	   else
+		   spider_movement = 200;
+
+	   spider_model->setPosition(Vector(spider_movement, 200, 100));
+	     ISound* I2 = SoundEngine->play3D("../IrrKlang-64bit-1.6.0/media/scuttle.wav", vec3df(spider_movement, 200, 100), false, false, true);
+		 I2->setMinDistance(5.0f);
+		 I2->setVolume(10.0);
    }
    if( key.keysym.sym == SDLK_0 )
       this->setNumPhysicsStepsPerRender( 1 );
 
-   if( key.keysym.sym == SDLK_1 )
+   if( key.keysym.sym == SDLK_c )
    {
 
+	   this->cone->setPosition(this->cone->getPosition() + Vector(25, 0, 0));
+	   this->client->sendNetMsgSynchronousTCP(MyMessenger(this->cone->getPosition()));
    }
 }
 
@@ -359,11 +444,11 @@ void Aftr::GLViewNewModule::loadMap()
    //this->setActor( wo );
    //netLst->push_back( wo );
 
-   std::string vader(ManagerEnvironmentConfiguration::getSMM() + "/models/vader.wrl");
-   WO* vader_model = WO::New(vader, Vector(1, 1, 1));
-  // WO* try1 = WO::New(ManagerEnvironmentConfiguration::getSMM() + "/models/WOCarHummerTruck.wrl", Vector(.1, 2, 2));
-   vader_model->setPosition(Vector(1, 1, 1));
-   worldLst->push_back(vader_model);
+   std::string spider(ManagerEnvironmentConfiguration::getLMM() + "/models/spider_binary.stl");
+   spider_model = WO::New(spider, Vector(5,5,5));
+   spider_model->setPosition(Vector(200,200, 100));
+   //vader_model->setPosition(Vector(0, 200, 100));
+   worldLst->push_back(spider_model);
 
    
    createNewModuleWayPoints();
